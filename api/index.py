@@ -1,15 +1,10 @@
-from flask import Flask, Response, request, stream_with_context, abort, make_response
+from flask import Flask, Response, request, stream_with_context, abort
 import requests, time, hashlib, random, threading
 from collections import deque, defaultdict
-from pathlib import Path
 
 app = Flask(__name__)
 
 IMGUR_CDN = "https://i.imgur.com"
-CACHE_TTL = 60 * 5  # 5 min
-STALE_IF_ERROR = True
-
-# Rate-limit
 CLIENT_WINDOW = 10
 CLIENT_MAX_REQUESTS = 6
 client_lock = threading.Lock()
@@ -26,9 +21,6 @@ MOBILE_UA = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
 
-metadata = {}
-meta_lock = threading.Lock()
-
 def client_allow(ip: str) -> bool:
     now = time.time()
     with client_lock:
@@ -40,10 +32,7 @@ def client_allow(ip: str) -> bool:
         dq.append(now)
     return True
 
-def key_from_path(img_path: str) -> str:
-    return hashlib.sha256(img_path.encode("utf-8")).hexdigest()
-
-def make_upstream_headers(prefer_mobile: bool = False):
+def make_upstream_headers(prefer_mobile=False):
     ua = MOBILE_UA if prefer_mobile else DESKTOP_UA
     headers = {
         "User-Agent": ua,
@@ -70,7 +59,6 @@ def proxy_imgur(img_path):
     upstream = f"{IMGUR_CDN}/{img_path}"
     headers = make_upstream_headers(prefer_mobile)
 
-    # Vercel doesn’t allow disk writes — so we skip file caching, only memory meta
     try:
         resp = session.get(upstream, headers=headers, stream=True, timeout=10)
     except requests.RequestException:
@@ -83,7 +71,6 @@ def proxy_imgur(img_path):
     if resp.status_code >= 400:
         return Response(resp.content, status=resp.status_code)
 
-    # Stream image
     r = Response(
         stream_with_context(resp.iter_content(8192)),
         status=resp.status_code,
@@ -92,6 +79,5 @@ def proxy_imgur(img_path):
     r.headers["Cache-Control"] = resp.headers.get("Cache-Control", "public, max-age=60")
     return r
 
-# Required for Vercel entry point
-def handler(event, context):
-    return app(event, context)
+# Vercel looks for "app" by default — this must exist at the module top level
+# (no need for custom handler)
