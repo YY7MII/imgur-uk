@@ -2,7 +2,7 @@
 // @name         Yummy Imgur Proxy
 // @namespace    yy7mii's imgur proxy for userscripts :p
 // @author       YY7MII
-// @version      1.0.3
+// @version      0.0.3
 // @description  Replace i.imgur.com references safely
 // @match        *://*/*
 // @run-at       document-end
