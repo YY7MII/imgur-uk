@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Yummy Imgur Proxy
-// @namespace    yy7mii's imgur proxy for userscripts :p
+// @namespace    https://imgur-uk.vercel.app
 // @author       YY7MII
 // @version      0.0.3
-// @description  Replace i.imgur.com references safely
-// @match        *://*/*
+// @description  yy7mii's imgur proxy for userscripts :p
+// @match        http://*/*
+// @match        https://*/*
 // @run-at       document-end
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js
