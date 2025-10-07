@@ -47,7 +47,7 @@ def make_upstream_headers(prefer_mobile=False):
     return headers
 
 @app.route("/")
-def index_page
+def index_page():
     return "<a href='https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>download userscript</a>"
 
 @app.route("/<path:img_path>")
