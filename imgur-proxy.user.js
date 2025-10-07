@@ -2,7 +2,7 @@
 // @name         Yummy Imgur Proxy
 // @namespace    yy7mii's imgur proxy for userscripts :p
 // @author       YY7MII
-// @version      1.0.2
+// @version      1.0.3
 // @description  Replace i.imgur.com references safely
 // @match        *://*/*
 // @run-at       document-end
@@ -19,57 +19,31 @@
   const FROM = 'i.imgur.com';
   const TO = 'imgur-uk.vercel.app';
 
-  // Safe attribute/text replacement for elements
-  function replaceElementUrls(el) {
-    if (el.hasAttribute('src')) {
-      el.src = el.src.replace(FROM, TO);
+  // Replace all existing img src
+  document.querySelectorAll('img').forEach(img => {
+    if (img.src.includes(FROM)) {
+      img.src = img.src.replace(FROM, TO);
     }
-    if (el.hasAttribute('href')) {
-      el.href = el.href.replace(FROM, TO);
-    }
-    if (el.hasAttribute('srcset')) {
-      el.srcset = el.srcset.replaceAll(FROM, TO);
-    }
-    if (el.hasAttribute('style')) {
-      el.style.cssText = el.style.cssText.replaceAll(FROM, TO);
-    }
-  }
+  });
 
-  // Replace text nodes (rarely used for URLs)
-  function walk(node) {
-    let child, next;
-    switch (node.nodeType) {
-      case 1:  // Element
-        replaceElementUrls(node);
-        for (child = node.firstChild; child; child = next) {
-          next = child.nextSibling;
-          walk(child);
-        }
-        break;
-      case 3:  // Text node
-        node.nodeValue = node.nodeValue.replaceAll(FROM, TO);
-        break;
-    }
-  }
-
-  walk(document.body);
-
-  // Observe DOM changes for dynamic content
+  // Observe new img elements added later
   const observer = new MutationObserver(mutations => {
     mutations.forEach(m => {
-      if (m.type === 'childList') {
-        m.addedNodes.forEach(n => walk(n));
-      } else if (m.type === 'attributes') {
-        walk(m.target);
-      }
+      m.addedNodes.forEach(node => {
+        if (node.tagName === 'IMG' && node.src.includes(FROM)) {
+          node.src = node.src.replace(FROM, TO);
+        }
+        // Also handle imgs inside added containers
+        if (node.querySelectorAll) {
+          node.querySelectorAll('img').forEach(img => {
+            if (img.src.includes(FROM)) {
+              img.src = img.src.replace(FROM, TO);
+            }
+          });
+        }
+      });
     });
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['src', 'href', 'srcset', 'style']
-  });
-
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
