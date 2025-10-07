@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Yummy Imgur Proxy
 // @namespace    yy7mii's imgur proxy for userscripts :p
-// @version      1.0.0
-// @description  Replace all i.imgur.com text with imgur-uk.vercel.app
+// @author       YY7MII
+// @version      1.0.1
+// @description  Replace all i.imgur.com html references with imgur-uk.vercel.app
 // @match        *://*/*
 // @run-at       document-end
 // @grant        none
