@@ -46,6 +46,10 @@ def make_upstream_headers(prefer_mobile=False):
         headers["X-Forwarded-User-Agent"] = client_ua
     return headers
 
+@app.route("/")
+def index_page
+    return "<a href='https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>download userscript</a>"
+
 @app.route("/<path:img_path>")
 def proxy_imgur(img_path):
     if ".." in img_path:
