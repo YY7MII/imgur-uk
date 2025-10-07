@@ -2,7 +2,7 @@
 // @name         Yummy Imgur Proxy
 // @namespace    https://imgur-uk.vercel.app
 // @author       YY7MII
-// @version      0.0.3
+// @version      0.0.4
 // @description  yy7mii's imgur proxy for userscripts :p
 // @match        http://*/*
 // @match        https://*/*
