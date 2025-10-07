@@ -48,7 +48,9 @@ def make_upstream_headers(prefer_mobile=False):
 
 @app.route("/")
 def index_page():
-    return "<a href='https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>download userscript</a>"
+    return """<head>
+  <meta http-equiv='refresh' content='0; URL=https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>
+</head>"""
 
 @app.route("/<path:img_path>")
 def proxy_imgur(img_path):
