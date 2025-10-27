@@ -1,6 +1,7 @@
 from flask import Flask, Response, request, stream_with_context, abort
 import requests, time, hashlib, random, threading
 from collections import deque, defaultdict
+import re
 
 app = Flask(__name__)
 
@@ -52,10 +53,14 @@ def index_page():
   <meta http-equiv='refresh' content='0; URL=https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>
 </head>"""
 
+
 @app.route("/<path:img_path>")
 def proxy_imgur(img_path):
     if ".." in img_path:
         abort(400)
+
+    #zoomed images _2x.png to .png
+    img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif))$', r'\1', img_path)
 
     client_ip = request.headers.get("x-forwarded-for", request.remote_addr or "unknown")
     if not client_allow(client_ip):
