@@ -2,8 +2,8 @@
 // @name         Yummy Imgur Proxy
 // @namespace    https://imgur-uk.vercel.app
 // @author       YY7MII
-// @version      0.1.0
-// @description  Proxy all i.imgur.com links (img + CSS) through imgur-uk.vercel.app
+// @version      0.1.1
+// @description  Proxy all i.imgur.com links (img + CSS + srcset) through imgur-uk.vercel.app
 // @match        http://*/*
 // @match        https://*/*
 // @run-at       document-end
@@ -24,14 +24,22 @@
     return str.replaceAll(FROM, TO);
   }
 
-  // --- 1. Rewrite <img> elements ---
+  // --- 1. Fix <img> tags (src + srcset) ---
   function fixImages(root = document) {
-    root.querySelectorAll('img[src*="' + FROM + '"]').forEach(img => {
-      img.src = replaceUrl(img.src);
+    root.querySelectorAll('img').forEach(img => {
+      // Replace src
+      if (img.src && img.src.includes(FROM)) {
+        img.src = replaceUrl(img.src);
+      }
+
+      // Replace srcset
+      if (img.srcset && img.srcset.includes(FROM)) {
+        img.srcset = replaceUrl(img.srcset);
+      }
     });
   }
 
-  // --- 2. Rewrite inline <style> blocks ---
+  // --- 2. Inline <style> tags ---
   function fixInlineStyles() {
     document.querySelectorAll('style').forEach(style => {
       if (style.textContent.includes(FROM)) {
@@ -40,33 +48,32 @@
     });
   }
 
-  // --- 3. Rewrite style="" attributes ---
+  // --- 3. style="" attributes ---
   function fixStyleAttributes(root = document) {
     root.querySelectorAll('[style*="' + FROM + '"]').forEach(el => {
       el.setAttribute('style', replaceUrl(el.getAttribute('style')));
     });
   }
 
-  // --- 4. Rewrite external CSS files dynamically ---
+  // --- 4. Linked CSS (also fetch remote CSS and patch it if needed) ---
   function fixLinkedCSS() {
     document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
       const href = link.href;
-      if (href && href.includes(FROM)) {
+      if (!href) return;
+
+      if (href.includes(FROM)) {
         link.href = replaceUrl(href);
-      } else {
-        // For cross-origin CSS that may contain Imgur URLs, fetch and replace them
-        if (href && !href.startsWith(window.location.origin)) {
-          fetch(href)
-            .then(r => r.text())
-            .then(css => {
-              if (css.includes(FROM)) {
-                const newStyle = document.createElement('style');
-                newStyle.textContent = replaceUrl(css);
-                document.head.appendChild(newStyle);
-              }
-            })
-            .catch(() => {});
-        }
+      } else if (!href.startsWith(window.location.origin)) {
+        fetch(href)
+          .then(r => r.text())
+          .then(css => {
+            if (css.includes(FROM)) {
+              const newStyle = document.createElement('style');
+              newStyle.textContent = replaceUrl(css);
+              document.head.appendChild(newStyle);
+            }
+          })
+          .catch(() => {});
       }
     });
   }
@@ -77,23 +84,30 @@
   fixStyleAttributes();
   fixLinkedCSS();
 
-  // --- 6. Observe future changes ---
+  // --- 6. Mutation observer for dynamically loaded content ---
   const observer = new MutationObserver(mutations => {
     for (const m of mutations) {
       for (const node of m.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
 
-        if (node.tagName === 'IMG' && node.src.includes(FROM)) {
-          node.src = replaceUrl(node.src);
+        // Handle newly added <img>
+        if (node.tagName === 'IMG') {
+          if (node.src && node.src.includes(FROM)) node.src = replaceUrl(node.src);
+          if (node.srcset && node.srcset.includes(FROM)) node.srcset = replaceUrl(node.srcset);
         }
+
+        // Handle new <style> tags
         if (node.tagName === 'STYLE' && node.textContent.includes(FROM)) {
           node.textContent = replaceUrl(node.textContent);
         }
-        if (node.hasAttribute && node.hasAttribute('style') && node.getAttribute('style').includes(FROM)) {
-          node.setAttribute('style', replaceUrl(node.getAttribute('style')));
+
+        // Handle inline styles
+        if (node.hasAttribute && node.hasAttribute('style')) {
+          const style = node.getAttribute('style');
+          if (style && style.includes(FROM)) node.setAttribute('style', replaceUrl(style));
         }
 
-        // Recursively fix inside containers
+        // Recursively patch inside container nodes
         fixImages(node);
         fixStyleAttributes(node);
       }
