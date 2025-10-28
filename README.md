@@ -1,6 +1,8 @@
 # Imgur UK Proxy - Browsers only no apps
 This Works on desktop and mobile[^1].
 
+[![status: working](https://img.shields.io/badge/status-working-brightgreen.svg)](https://github.com/yy7mii/imgur-uk)
+
 you can Download Userscript from [here](https://imgur-uk.vercel.app/) or the site linked to this repo then move to stage 2
 
 ## IOS guide - Stage 2.1
