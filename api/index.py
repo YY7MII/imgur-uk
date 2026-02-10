@@ -79,7 +79,7 @@ def proxy_imgur(img_path):
                 upstream,
                 headers=headers,
                 timeout=10,
-                allow_redirects=False,   
+                allow_redirects=False,   # Important: don’t auto-follow Imgur redirects
             )
         except requests.RequestException:
             abort(502, "Imgur unreachable")
@@ -95,34 +95,39 @@ def proxy_imgur(img_path):
             return Response(resp.content, status=resp.status_code)
     
         html = resp.text
-    
-        # ---- HARD REWRITES ----
+
+        # ---- STRIP ANTI-PROXY JS ----
+        html = re.sub(
+            r'<script>.*?-1===\["i"\.concat\("mgur\.com"\).*?window\.location\.replace\("https://i"\.concat\("mgur\.com"\)\).*?</script>',
+            '',
+            html,
+            flags=re.I | re.S,
+        )
+
+        # ---- STRIP ANY OTHER JS REDIRECTS ----
+        html = re.sub(
+            r'window\.location\.(replace|assign)\([^)]*\)',
+            '/* blocked redirect */',
+            html,
+            flags=re.I
+        )
+
+        # ---- REWRITE ALL LINKS ----
         html = html.replace("i.imgur.com", "imgur-uk.vercel.app")
         html = html.replace("https://imgur.com/", "https://imgur-uk.vercel.app/")
         html = html.replace("http://imgur.com/", "https://imgur-uk.vercel.app/")
-    
-        # ---- Kill JS-based redirects ----
-        html = re.sub(
-            r'window\.location\s*=\s*["\']https?://imgur\.com/[^"\']+["\']',
-            '/* stripped redirect */',
-            html,
-            flags=re.I,
-        )
-    
-        # ---- Add <base> to trap relative navigations ----
+
+        # ---- ADD <base> TO FIX RELATIVE LINKS ----
         html = html.replace(
             "<head>",
             "<head><base href='https://imgur-uk.vercel.app/'>",
             1,
         )
-    
+
         return Response(html, content_type="text/html")
 
-
-    # ---- IMAGE MODE (existing logic) ----
-
+    # ---- IMAGE MODE ----
     img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif))$', r'\1', img_path)
-
     prefer_mobile = "Mobile" in (request.headers.get("User-Agent") or "")
     upstream = f"{IMGUR_CDN}/{img_path}"
     headers = make_upstream_headers(prefer_mobile)
@@ -146,6 +151,7 @@ def proxy_imgur(img_path):
     )
     r.headers["Cache-Control"] = resp.headers.get("Cache-Control", "public, max-age=60")
     return r
+
 
 # Vercel looks for "app" by default — this must exist at the module top level
 # (no need for custom handler)
