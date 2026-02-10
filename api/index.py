@@ -6,6 +6,7 @@ import re
 app = Flask(__name__)
 
 IMGUR_CDN = "https://i.imgur.com"
+IMGUR_PAGE = "https://imgur.com"
 CLIENT_WINDOW = 10
 CLIENT_MAX_REQUESTS = 6
 client_lock = threading.Lock()
@@ -59,12 +60,39 @@ def proxy_imgur(img_path):
     if ".." in img_path:
         abort(400)
 
-    #zoomed images _2x.png to .png
-    img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif))$', r'\1', img_path)
-
     client_ip = request.headers.get("x-forwarded-for", request.remote_addr or "unknown")
     if not client_allow(client_ip):
         return Response("Rate limit exceeded", status=429)
+
+    # ---- ALBUM / GALLERY MODE ----
+    if img_path.startswith("a/") or img_path.startswith("gallery/"):
+        upstream = f"{IMGUR_PAGE}/{img_path}"
+
+        headers = {
+            "User-Agent": DESKTOP_UA,
+            "Accept": "text/html",
+            "Referer": "https://imgur.com/",
+        }
+
+        try:
+            resp = session.get(upstream, headers=headers, timeout=10)
+        except requests.RequestException:
+            abort(502, "Imgur unreachable")
+
+        if resp.status_code >= 400:
+            return Response(resp.content, status=resp.status_code)
+
+        html = resp.text
+
+        # Rewrite links
+        html = html.replace("i.imgur.com", "imgur-uk.vercel.app")
+        html = html.replace("https://imgur.com/", "https://imgur-uk.vercel.app/")
+
+        return Response(html, content_type="text/html")
+
+    # ---- IMAGE MODE (existing logic) ----
+
+    img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif))$', r'\1', img_path)
 
     prefer_mobile = "Mobile" in (request.headers.get("User-Agent") or "")
     upstream = f"{IMGUR_CDN}/{img_path}"
