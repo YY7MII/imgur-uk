@@ -2,7 +2,7 @@
 // @name         Yummy Imgur Proxy
 // @namespace    https://imgur-uk.vercel.app
 // @author       YY7MII
-// @version      0.1.1
+// @version      0.1.2
 // @description  Proxy all i.imgur.com links (img + CSS + srcset) through imgur-uk.vercel.app
 // @match        http://*/*
 // @match        https://*/*
@@ -79,11 +79,16 @@
   }
 
   // --- 5. Initial run ---
-  fixImages();
-  fixInlineStyles();
-  fixStyleAttributes();
-  fixLinkedCSS();
+  function runAll() {
+    fixImages();
+    fixInlineStyles();
+    fixStyleAttributes();
+    fixLinkedCSS();
+  }
 
+  runAll();
+
+  setInterval(runAll, 3500);
   // --- 6. Mutation observer for dynamically loaded content ---
   const observer = new MutationObserver(mutations => {
     for (const m of mutations) {
