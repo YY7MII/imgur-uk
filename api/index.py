@@ -66,29 +66,58 @@ def proxy_imgur(img_path):
 
     # ---- ALBUM / GALLERY MODE ----
     if img_path.startswith("a/") or img_path.startswith("gallery/"):
-        upstream = f"{IMGUR_PAGE}/{img_path}"
+    upstream = f"{IMGUR_PAGE}/{img_path}"
 
-        headers = {
-            "User-Agent": DESKTOP_UA,
-            "Accept": "text/html",
-            "Referer": "https://imgur.com/",
-        }
+    headers = {
+        "User-Agent": DESKTOP_UA,
+        "Accept": "text/html",
+        "Referer": "https://imgur.com/",
+    }
 
-        try:
-            resp = session.get(upstream, headers=headers, timeout=10)
-        except requests.RequestException:
-            abort(502, "Imgur unreachable")
+    try:
+        resp = session.get(
+            upstream,
+            headers=headers,
+            timeout=10,
+            allow_redirects=False,   
+        )
+    except requests.RequestException:
+        abort(502, "Imgur unreachable")
 
-        if resp.status_code >= 400:
-            return Response(resp.content, status=resp.status_code)
+    # ---- Handle Imgur redirect headers ----
+    if resp.status_code in (301, 302, 303, 307, 308):
+        loc = resp.headers.get("Location", "")
+        if loc.startswith("https://imgur.com/"):
+            loc = loc.replace("https://imgur.com/", "https://imgur-uk.vercel.app/")
+        return Response("", status=302, headers={"Location": loc})
 
-        html = resp.text
+    if resp.status_code >= 400:
+        return Response(resp.content, status=resp.status_code)
 
-        # Rewrite links
-        html = html.replace("i.imgur.com", "imgur-uk.vercel.app")
-        html = html.replace("https://imgur.com/", "https://imgur-uk.vercel.app/")
+    html = resp.text
 
-        return Response(html, content_type="text/html")
+    # ---- HARD REWRITES ----
+    html = html.replace("i.imgur.com", "imgur-uk.vercel.app")
+    html = html.replace("https://imgur.com/", "https://imgur-uk.vercel.app/")
+    html = html.replace("http://imgur.com/", "https://imgur-uk.vercel.app/")
+
+    # ---- Kill JS-based redirects ----
+    html = re.sub(
+        r'window\.location\s*=\s*["\']https?://imgur\.com/[^"\']+["\']',
+        '/* stripped redirect */',
+        html,
+        flags=re.I,
+    )
+
+    # ---- Add <base> to trap relative navigations ----
+    html = html.replace(
+        "<head>",
+        "<head><base href='https://imgur-uk.vercel.app/'>",
+        1,
+    )
+
+    return Response(html, content_type="text/html")
+
 
     # ---- IMAGE MODE (existing logic) ----
 
