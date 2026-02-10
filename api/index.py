@@ -1,6 +1,7 @@
 from flask import Flask, Response, request, stream_with_context, abort
 import requests, re, threading, time
 from collections import deque, defaultdict
+import json
 
 app = Flask(__name__)
 
@@ -79,13 +80,25 @@ def proxy_imgur(img_path):
 
         # Extract image hashes from the page
         # Imgur embeds JSON like: "hash":"abc123", "ext":".jpg"
-        images = re.findall(r'"hash":"([a-zA-Z0-9]+)","ext":"(\.[a-z]+)"', html)
-        if not images:
+        # extract JSON from page
+        m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*});', html)
+        if not m:
+            return Response("Album not found", status=404)
+        
+        data = json.loads(m.group(1))
+        
+        # traverse to find image list
+        try:
+            album_hashes = []
+            media = data['gallery']['albums'][img_path.split('/')[-1]]['images']
+            for img in media:
+                album_hashes.append((img['hash'], img['ext']))
+        except Exception:
             return Response("Album not found", status=404)
 
         # Build proxied HTML
         img_tags = "".join(
-            f"<img src='https://imgur-uk.vercel.app/i/{hash_}{ext}' />" for hash_, ext in images
+            f"<img src='https://imgur-uk.vercel.app/i/{h}{ext}' />" for h, ext in album_hashes
         )
         html_out = f"<html><head><base href='https://imgur-uk.vercel.app/'></head><body>{img_tags}</body></html>"
 
