@@ -52,6 +52,10 @@ def make_upstream_headers(prefer_mobile=False):
 def index_page():
     return """<head>
   <meta http-equiv='refresh' content='0; URL=https://raw.githubusercontent.com/YY7MII/imgur-uk/main/imgur-proxy.user.js'>
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>"""
 
 @app.route("/<path:img_path>")
@@ -100,7 +104,11 @@ def proxy_imgur(img_path):
         img_tags = "".join(
             f"<img src='https://imgur-uk.vercel.app/i/{h}{ext}' />" for h, ext in album_hashes
         )
-        html_out = f"<html><head><base href='https://imgur-uk.vercel.app/'></head><body>{img_tags}</body></html>"
+        analytics_script = """<script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>"""
+        html_out = f"<html><head><base href='https://imgur-uk.vercel.app/'>{analytics_script}</head><body>{img_tags}</body></html>"
 
         return Response(html_out, content_type="text/html")
 
