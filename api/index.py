@@ -1,17 +1,15 @@
 from flask import Flask, Response, request, stream_with_context, abort
 import requests, re, threading, time
 from collections import deque, defaultdict
-import json
 
 app = Flask(__name__)
 
 IMGUR_CDN = "https://i.imgur.com"
-IMGUR_PAGE = "https://imgur.com"
 CLIENT_WINDOW = 10
 CLIENT_MAX_REQUESTS = 6
+
 client_lock = threading.Lock()
 client_requests = defaultdict(lambda: deque())
-
 session = requests.Session()
 
 DESKTOP_UA = (
@@ -43,9 +41,6 @@ def make_upstream_headers(prefer_mobile=False):
         "Referer": "https://imgur.com/",
         "DNT": "1",
     }
-    client_ua = request.headers.get("User-Agent")
-    if client_ua:
-        headers["X-Forwarded-User-Agent"] = client_ua
     return headers
 
 @app.route("/")
@@ -67,53 +62,9 @@ def proxy_imgur(img_path):
     if not client_allow(client_ip):
         return Response("Rate limit exceeded", status=429)
 
-    # --- ALBUM / GALLERY SCRAPING ---
-    if img_path.startswith("a/") or img_path.startswith("gallery/"):
-        upstream = f"{IMGUR_PAGE}/{img_path}"
-        headers = {"User-Agent": DESKTOP_UA, "Referer": "https://imgur.com/"}
+    # normalize resized variants (_640x.jpg → .jpg)
+    img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif|webp))$', r'\1', img_path)
 
-        try:
-            resp = session.get(upstream, headers=headers, timeout=10)
-        except requests.RequestException:
-            abort(502, "Imgur unreachable")
-
-        if resp.status_code >= 400:
-            return Response(resp.content, status=resp.status_code)
-
-        html = resp.text
-
-        # Extract image hashes from the page
-        # Imgur embeds JSON like: "hash":"abc123", "ext":".jpg"
-        # extract JSON from page
-        m = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*});', html)
-        if not m:
-            return Response("Album not found", status=404)
-        
-        data = json.loads(m.group(1))
-        
-        # traverse to find image list
-        try:
-            album_hashes = []
-            media = data['gallery']['albums'][img_path.split('/')[-1]]['images']
-            for img in media:
-                album_hashes.append((img['hash'], img['ext']))
-        except Exception:
-            return Response("Album not found", status=404)
-
-        # Build proxied HTML
-        img_tags = "".join(
-            f"<img src='https://imgur-uk.vercel.app/i/{h}{ext}' />" for h, ext in album_hashes
-        )
-        analytics_script = """<script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>"""
-        html_out = f"<html><head><base href='https://imgur-uk.vercel.app/'>{analytics_script}</head><body>{img_tags}</body></html>"
-
-        return Response(html_out, content_type="text/html")
-
-    # --- IMAGE MODE ---
-    img_path = re.sub(r'_\d+x(\.(?:png|jpg|jpeg|gif))$', r'\1', img_path)
     prefer_mobile = "Mobile" in (request.headers.get("User-Agent") or "")
     upstream = f"{IMGUR_CDN}/{img_path}"
     headers = make_upstream_headers(prefer_mobile)
@@ -124,8 +75,7 @@ def proxy_imgur(img_path):
         abort(502, "Imgur unreachable")
 
     if resp.status_code == 429:
-        retry_after = resp.headers.get("Retry-After", "60")
-        return Response("Upstream rate limit", status=429, headers={"Retry-After": retry_after})
+        return Response("Upstream rate limit", status=429)
 
     if resp.status_code >= 400:
         return Response(resp.content, status=resp.status_code)
@@ -135,5 +85,5 @@ def proxy_imgur(img_path):
         status=resp.status_code,
         content_type=resp.headers.get("Content-Type", "image/jpeg"),
     )
-    r.headers["Cache-Control"] = resp.headers.get("Cache-Control", "public, max-age=60")
+    r.headers["Cache-Control"] = resp.headers.get("Cache-Control", "public, max-age=300")
     return r
